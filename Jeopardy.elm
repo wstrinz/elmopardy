@@ -125,6 +125,7 @@ type Msg =
   | Hide Card
   | ShowA Card
   | Finish Card Bool
+  | Score (Player, Card)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -141,24 +142,19 @@ update msg model =
         simpleUpdate {model | players = [decPlayer]}
       ShowQ card -> setState card Focused
       Hide card -> setState card Hidden
-      Finish card isCorrect -> simpleUpdate <| handlePlayerAnswer model card isCorrect
+      Finish card isCorrect -> simpleUpdate <| handlePlayerAnswer model card True
       ShowA card ->
         simpleUpdate <| setCardState model {card | state = Answered}
+      Score _ -> simpleUpdate model
 
 
+-- handleAnswer : Model -> Card -> Bool -> Model
+-- handleAnswer model card isCorrect = handlePlayerAnswer model card isCorrect
 handlePlayerAnswer : Model -> Card -> Bool -> Model
 handlePlayerAnswer model card isCorrect =
   let
     equivCards ca cb = ca.question == cb.question && ca.value == cb.value
-
     checkCat category = {category | cards = List.map checkCard category.cards}
-    updatePlayer scanP =
-      if model.currentPlayer == scanP then
-        {scanP |
-          score = scanP.score + scoreChange }
-        else
-          scanP
-
     scoreChange =
       if isCorrect then
         card.value
@@ -169,14 +165,15 @@ handlePlayerAnswer model card isCorrect =
       if equivCards card c then
         {card | state = Finished }
       else
-        c
-
-    cp = model.currentPlayer
-    newP = {cp | score = model.currentPlayer.score + scoreChange }
-  in
-    {model | categories = List.map checkCat model.categories
-           , players = List.map updatePlayer model.players
-           , currentPlayer = newP }
+        card
+    updatePlayer scanP =
+      if model.currentPlayer == scanP then
+        {scanP | score = scanP.score + scoreChange }
+      else
+        scanP
+    in
+      {model | categories = List.map checkCat model.categories
+             , players = List.map updatePlayer model.players }
 
 setCardState : Model -> Card -> Model
 setCardState model newCard =
