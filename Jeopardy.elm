@@ -2,7 +2,7 @@ module Jeopardy exposing (..)
 
 import Types exposing (..)
 import Categories exposing (..)
-import Cards exposing (..)
+-- import Cards exposing (..)
 import List.Extra
 import List exposing (map)
 import Html exposing (div, button, text, tr, table, td, tbody, thead, th)
@@ -13,7 +13,7 @@ import VirtualDom exposing (property, style)
 -- Model Types
 type alias Player = { name : String, score : Int }
 
-type alias Model = { categories : List Category, players : List Player }
+type alias Model = { categories : List Category, players : List Player, currentPlayer : Player }
 
 -- Entry Point
 main : Program Never
@@ -33,7 +33,7 @@ initialPlayers : List Player
 initialPlayers = [initialPlayer]
 
 initialModel : Model
-initialModel = { categories = initialCategories, players = initialPlayers }
+initialModel = { categories = initialCategories, players = initialPlayers, currentPlayer = initialPlayer }
 
 init : ( Model, Cmd a )
 init = ( initialModel, Cmd.none )
@@ -46,7 +46,15 @@ view model =
     div []
       [ -- dbgDiv model player ,
         div [] [ gameBoard model ]
+      , playerDiv model
       ]
+
+playerDiv : Model -> Html.Html Msg
+playerDiv model =
+  div []
+  [ text "player: "
+  , text <| toString model.currentPlayer
+  ]
 
 gameBoard : Model -> Html.Html Msg
 gameBoard model =
@@ -74,33 +82,33 @@ cardCell card =
         Hidden -> toString card.value
         Focused -> card.question
         Answered -> card.answer
-        Used -> "        "
+        Finished -> "        "
 
     buttonText =
       case card.state of
         Hidden -> "Show"
         Focused -> "Answer"
-        Used -> ""
+        Finished -> ""
         Answered -> "Hide"
 
     cardAction =
       case card.state of
-        Hidden -> [onClick <| Show card]
-        Focused -> [onClick <| Answer card True]
-        Answered -> [onClick <| Finish card]
+        Hidden -> [onClick <| ShowQ card]
+        Focused -> [onClick <| ShowA card]
         _ -> []
 
     cardButtons =
       case card.state of
-        Hidden -> [onClick <| Show card]
-        Focused -> [onClick <| Answer card True]
-        Answered -> [onClick <| Finish card]
-        _ -> []
+        Answered -> [ button [onClick <| Finish card True] [text "y"]
+                    , button [onClick <| Finish card False] [text "n"]
+                    ]
+        _ -> [ button cardAction [text buttonText] ]
+
+    cardInfo = [ text cardText
+               , Html.br [] [] ]
 
   in
-    td tdS [ text cardText
-           , Html.br [] []
-           , button cardAction [text buttonText] ]
+    td tdS <| List.append cardInfo cardButtons
 
 categoryCell : Model -> Category -> Html.Html Msg
 categoryCell model category =
@@ -113,11 +121,10 @@ categoryCell model category =
 type Msg =
   Increment (Player, Int) -- for testing; eventually remove
   | Decrement (Player, Int) --  in favor of 'Score'
-  | Show Card
+  | ShowQ Card
   | Hide Card
-  | Finish Card
-  | Answer Card Bool
-  | Score (Player, Card)
+  | ShowA Card
+  | Finish Card Bool
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -132,15 +139,44 @@ update msg model =
         simpleUpdate {model | players = [incPlayer]}
       Decrement (player, amt) ->
         simpleUpdate {model | players = [decPlayer]}
-      Show card -> setState card Focused
+      ShowQ card -> setState card Focused
       Hide card -> setState card Hidden
-      Finish card -> setState card Used
-      Answer card isCorrect -> handleAnswer model card isCorrect
-      Score _ -> simpleUpdate model
+      Finish card isCorrect -> simpleUpdate <| handlePlayerAnswer model card isCorrect
+      ShowA card ->
+        simpleUpdate <| setCardState model {card | state = Answered}
 
-handleAnswer : Model -> Card -> b -> ( Model, Cmd c )
-handleAnswer model card isCorrect =
-  simpleUpdate <| setCardState model {card | state = Answered}
+
+handlePlayerAnswer : Model -> Card -> Bool -> Model
+handlePlayerAnswer model card isCorrect =
+  let
+    equivCards ca cb = ca.question == cb.question && ca.value == cb.value
+
+    checkCat category = {category | cards = List.map checkCard category.cards}
+    updatePlayer scanP =
+      if model.currentPlayer == scanP then
+        {scanP |
+          score = scanP.score + scoreChange }
+        else
+          scanP
+
+    scoreChange =
+      if isCorrect then
+        card.value
+      else
+        -1 * card.value
+
+    checkCard c =
+      if equivCards card c then
+        {card | state = Finished }
+      else
+        c
+
+    cp = model.currentPlayer
+    newP = {cp | score = model.currentPlayer.score + scoreChange }
+  in
+    {model | categories = List.map checkCat model.categories
+           , players = List.map updatePlayer model.players
+           , currentPlayer = newP }
 
 setCardState : Model -> Card -> Model
 setCardState model newCard =
@@ -154,6 +190,7 @@ setCardState model newCard =
         card
   in
     {model | categories = List.map checkCat model.categories}
+
 
 
 -- convenience methods
