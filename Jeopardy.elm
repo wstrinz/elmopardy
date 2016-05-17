@@ -80,26 +80,26 @@ cardCell card =
     cardText =
       case card.state of
         Hidden -> toString card.value
-        Focused -> card.question
-        Answered -> card.answer
+        QuestionShown -> card.question
+        AnswerShown -> card.answer
         Finished -> "        "
 
     buttonText =
       case card.state of
         Hidden -> "Show"
-        Focused -> "Answer"
+        QuestionShown -> "Answer"
         Finished -> ""
-        Answered -> "Hide"
+        AnswerShown -> "Hide"
 
     cardAction =
       case card.state of
         Hidden -> [onClick <| ShowQ card]
-        Focused -> [onClick <| ShowA card]
+        QuestionShown -> [onClick <| ShowA card]
         _ -> []
 
     cardButtons =
       case card.state of
-        Answered -> [ button [onClick <| Finish card True] [text "y"]
+        AnswerShown -> [ button [onClick <| Finish card True] [text "y"]
                     , button [onClick <| Finish card False] [text "n"]
                     ]
         _ -> [ button cardAction [text buttonText] ]
@@ -140,11 +140,10 @@ update msg model =
         simpleUpdate {model | players = [incPlayer]}
       Decrement (player, amt) ->
         simpleUpdate {model | players = [decPlayer]}
-      ShowQ card -> setState card Focused
+      ShowQ card -> setState card QuestionShown
       Hide card -> setState card Hidden
-      Finish card isCorrect -> simpleUpdate <| handlePlayerAnswer model card True
-      ShowA card ->
-        simpleUpdate <| setCardState model {card | state = Answered}
+      Finish card isCorrect -> simpleUpdate <| handlePlayerAnswer model card isCorrect
+      ShowA card -> setState card AnswerShown
       Score _ -> simpleUpdate model
 
 
@@ -165,15 +164,19 @@ handlePlayerAnswer model card isCorrect =
       if equivCards card c then
         {card | state = Finished }
       else
-        card
+        c
+
+    currPlayer = model.currentPlayer
+    updatedPlayer = {currPlayer | score = model.currentPlayer.score + scoreChange }
     updatePlayer scanP =
       if model.currentPlayer == scanP then
-        {scanP | score = scanP.score + scoreChange }
+        updatedPlayer
       else
         scanP
     in
       {model | categories = List.map checkCat model.categories
-             , players = List.map updatePlayer model.players }
+             , players = List.map updatePlayer model.players
+             , currentPlayer = updatedPlayer }
 
 setCardState : Model -> Card -> Model
 setCardState model newCard =
