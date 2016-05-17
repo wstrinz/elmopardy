@@ -1,6 +1,6 @@
 module Categories exposing (..)
 import Types exposing (..)
-import Cards exposing (initialCatCards)
+import Cards exposing (initialCatCards, initPrezCards)
 
 placeholderCategory : String -> Category
 placeholderCategory name =
@@ -26,5 +26,5 @@ initialCategories : List Category
 initialCategories = [ {name = "Cats", cards = initialCatCards}
                     , placeholderCategory "boots"
                     , placeholderCategory "foo"
-                    , placeholderCategory "bar"
+                    , {name = "Presidents", cards = initPrezCards}
                     , placeholderCategory "borges" ]
