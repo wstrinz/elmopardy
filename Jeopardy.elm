@@ -30,7 +30,7 @@ initialPlayer : Player
 initialPlayer = { name = "Will", score = 0 }
 
 initialPlayers : List Player
-initialPlayers = [initialPlayer]
+initialPlayers = [initialPlayer, {name = "OtherPlayer", score = 0}]
 
 initialModel : Model
 initialModel = { categories = initialCategories, players = initialPlayers, currentPlayer = initialPlayer }
@@ -176,7 +176,7 @@ handlePlayerAnswer model card isCorrect =
     in
       {model | categories = List.map checkCat model.categories
              , players = List.map updatePlayer model.players
-             , currentPlayer = updatedPlayer }
+             , currentPlayer = nextPlayer model }
 
 setCardState : Model -> Card -> Model
 setCardState model newCard =
@@ -191,10 +191,8 @@ setCardState model newCard =
   in
     {model | categories = List.map checkCat model.categories}
 
-
-
 -- convenience methods
-playerOrInit : { a | players : List Player } -> Player
+playerOrInit : Model -> Player
 playerOrInit model = Maybe.withDefault initialPlayer <| List.head model.players
 
 simpleUpdate : Model -> ( Model, Cmd b )
@@ -203,3 +201,16 @@ simpleUpdate newModel = (newModel, Cmd.none)
 cardRows : Model -> List (List Card)
 cardRows model =
   List.Extra.transpose <| map .cards model.categories
+
+nextEl : a -> List a -> a
+nextEl target list =
+  let
+    newEl = List.head <| List.drop 1 <| List.Extra.dropWhile (\el -> not (el == target)) list
+    firstEl = Maybe.withDefault target <| List.head list
+  in
+    case newEl of
+      Just p -> p
+      _ -> firstEl
+
+nextPlayer : Model -> Player
+nextPlayer model = nextEl model.currentPlayer model.players
